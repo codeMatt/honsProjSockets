@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    >
+
+	<LinearLayout
+    	android:orientation="horizontal"
+    	android:layout_width="fill_parent"
+    	android:layout_height="50dp"
+    	>
+		<Button
+       		android:id="@+id/button1"
+        	android:layout_width="wrap_content"
+        	android:layout_height="wrap_content"
+        	android:text="@string/register_button" />
+    	<EditText android:id="@+id/nameString"
+            android:layout_width="245dp"
+            android:layout_height="wrap_content"
+            android:text="@string/name_string"
+            android:inputType="text" />	
+	</LinearLayout>
+	
+	<LinearLayout
+    	android:orientation="horizontal"
+    	android:layout_width="fill_parent"
+    	android:layout_height="60dp"
+    	>
+		<Button
+       		android:id="@+id/button2"
+        	android:layout_width="75dp"
+        	android:layout_height="wrap_content"
+        	android:text="@string/get_file_1" />
+		<Button
+       		android:id="@+id/button3"
+        	android:layout_width="75dp"
+        	android:layout_height="wrap_content"
+        	android:text="@string/get_file_many" />
+		
+		<EditText android:id="@+id/addressString"
+            android:layout_width="150dp"
+            android:layout_height="fill_parent"
+            android:inputType="text" />
+
+	 </LinearLayout>
+	
+	<TextView  
+    android:layout_width="fill_parent" 
+    android:layout_height="wrap_content" 
+    android:text="@string/hello"
+    />
+    <TextView android:id="@+id/text"
+              android:layout_width="wrap_content"
+              android:layout_height="wrap_content"
+              android:text="" />
+
+
+
+</LinearLayout>
