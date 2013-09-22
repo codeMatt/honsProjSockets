@@ -2,6 +2,7 @@ package com.heeere.android.dnssdtuto;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -247,25 +248,23 @@ public class DnssdDiscovery extends Activity {
 							//set up file
 							path.mkdirs();
 							File myFile = new File (path, messages[1]);
-							System.out.println("File exists? " + myFile.exists());
+							//System.out.println("File exists? " + myFile.exists());
 
 							// read data from file into byte array
 							byte [] mybytearray = new byte [(int)myFile.length()];
 							fis = new FileInputStream(myFile);
-							bis = new BufferedInputStream(fis);
+							bis = new BufferedInputStream(fis, 1024);
 							bis.read(mybytearray,0,mybytearray.length);	
 
 							//System.out.println(messages[0]);
-							//sends EOF on outputstream so that new outputstream can be opened
-							//sock.shutdownOutput();
 
 							// send data to other device from bytearray
 							OutputStream os = sock.getOutputStream();
-							os.write(mybytearray,0,mybytearray.length);
+							os.write(mybytearray,0,mybytearray.length);	
 							os.flush();
 
 							//send EOF of data stream
-							//sock.shutdownOutput();
+							sock.shutdownOutput();
 							System.out.println("sent File, receiving text message");
 
 							//receive message from other device
@@ -291,8 +290,7 @@ public class DnssdDiscovery extends Activity {
 					System.out.println("Error receiving confirmation, ClassNotException");
 					e.printStackTrace();
 				}
-				finally{
-					System.out.println("entered finally block");
+				
 					//house cleaning of streams and socket
 					notifyUser("closing connections");
 					try{
@@ -306,7 +304,7 @@ public class DnssdDiscovery extends Activity {
 						System.out.println("Error closing streams, IOException");
 						e.printStackTrace();
 					}
-				}
+				
 			}
 		};
 		fileReceiving.start();
@@ -370,6 +368,10 @@ public class DnssdDiscovery extends Activity {
 								//System.out.println(count);
 								is.read(mybytearray, count, (mybytearray.length-count));
 								bos.write(mybytearray, 0, count);
+								
+								//need to check for end of file somehow
+								//and break out of the loop
+							
 							}
 							
 							/*bytesRead = is.read(mybytearray, 0 , mybytearray.length);
@@ -447,12 +449,14 @@ public class DnssdDiscovery extends Activity {
     	
     	
     	String text = "This is a tester file created in the app dnssddemo";
+    	String text2 = "This is a tester file created in the app dnssddemo, it is a longer file than the first file for testing purposes, just for me. I don't like have good grammar";
 		File path = getFilesDir();
 		File file = new File (path, "newTestFile.txt");
 		File file2 = new File (path, "secondFile.txt");
     	
     	try {
-    		byte[] data = text.getBytes("UTF8");    		
+    		byte[] data = text.getBytes("UTF8");
+    		byte[] data2 = text2.getBytes("UTF8"); 
 			file.createNewFile();
 			file2.createNewFile();
 			if(file.exists() && file2.exists())
@@ -462,7 +466,7 @@ public class DnssdDiscovery extends Activity {
 			     fo.close();
 			     
 			     OutputStream fo2 = new FileOutputStream(file2);              
-			     fo2.write(data);
+			     fo2.write(data2);
 			     fo2.close();
 			     System.out.println("2 files created: ");
 			     
