@@ -91,9 +91,9 @@ public class DnssdDiscovery extends Activity {
 					
 				EditText address = (EditText) findViewById (R.id.addressString);   
 				String[] tempAddress = address.getText().toString().split(":");				
-				int port = Integer.parseInt(tempAddress[1]);
+				//int port = Integer.parseInt(tempAddress[1]);
 				String[] files = {"newTestFile.txt"};
-				initiateFileTransfer(tempAddress[0], port, files);
+				initiateFileTransfer(tempAddress[0], 5000, files);
 				
 				}catch(Exception e){
 					notifyUser("Please enter the address correctly");
@@ -112,8 +112,8 @@ public class DnssdDiscovery extends Activity {
 				EditText address = (EditText) findViewById (R.id.addressString);
 				String[] files = { "newTestFile.txt", "secondFile.txt"};				
 				String[] tempAddress = address.getText().toString().split(":");				
-				int port = Integer.parseInt(tempAddress[1]);				
-				initiateFileTransfer(tempAddress[0], port, files);
+				//int port = Integer.parseInt(tempAddress[1]);				
+				initiateFileTransfer(tempAddress[0], 5000, files);
 				
 				}catch(Exception e){
 					notifyUser("Please enter the address correctly");
@@ -183,6 +183,8 @@ public class DnssdDiscovery extends Activity {
         }
     }
 	
+	//method to show the ip from the wifimanager
+	
 	//method to show the IP of the device through the wifimanager
 	public void showIP(){
 		//print out the IP address of the local device
@@ -191,6 +193,7 @@ public class DnssdDiscovery extends Activity {
 		WifiConfiguration wc = l.get(0); 
 		notifyUser("\n"+ Formatter.formatIpAddress(wim.getConnectionInfo().getIpAddress()));
 	}
+	
 	
 	/* Checks if external storage is available for read and write */
 	public boolean isExternalStorageWritable() {
@@ -217,70 +220,92 @@ public class DnssdDiscovery extends Activity {
 			private ServerSocket connection = new ServerSocket(port);
 
 			public void run(){
+				
+				Socket sock = null;
+				ObjectInputStream ois = null;
+				FileInputStream fis = null;
+				BufferedInputStream bis = null;
+				
 				try{	
 					while (true) {
 
 						//accept a socket connection from remote location
-						Socket sock = connection.accept();
+						sock = connection.accept();
 						notifyUser("New socket accepted");
 						
 						//receive message from other device
-						ObjectInputStream ois = new ObjectInputStream(sock.getInputStream());
+						ois = new ObjectInputStream(sock.getInputStream());
 						//ois.skip(Long.MAX_VALUE);
-						String message = (String) ois.readObject();
-						System.out.println("from other device: " + message);
-						String[] messages = message.split("-");
+						String receivedmessage = (String) ois.readObject();
+						System.out.println("from other device: " + receivedmessage);
+						String[] messages = receivedmessage.split("-");
 						
-						//set up file
 						File path = getFilesDir();
-						File myFile = new File (path, messages[1]);
-						path.mkdirs();
+						
+						while(!(messages[0].equals("finish"))){
 
-						// read data from file into byte array
-						byte [] mybytearray = new byte [(int)myFile.length()];
-						FileInputStream fis = new FileInputStream(myFile);
-						BufferedInputStream bis = new BufferedInputStream(fis);
-						bis.read(mybytearray,0,mybytearray.length);	
-						
-						while(!(message.equals("finish"))){
-						
-						//sends EOF on outputstream so that new outputstream can be opened
-						sock.shutdownOutput();
-										
-						// send data to other device
-						OutputStream os = sock.getOutputStream();
-						os.write(mybytearray,0,mybytearray.length);
-						os.flush();
-						
-						//send EOF of data stream
-						sock.shutdownOutput();
-						System.out.println("Got File, receiving next message");
-						
-						//receive message from other device
-						ObjectInputStream ois2 = new ObjectInputStream(sock.getInputStream());
-						ois2.skip(Long.MAX_VALUE);
-						message = (String) ois2.readObject();
-						System.out.println("from other device: " + message);						
+							//set up file
+							path.mkdirs();
+							File myFile = new File (path, messages[1]);
+							System.out.println("File exists? " + myFile.exists());
+
+							// read data from file into byte array
+							byte [] mybytearray = new byte [(int)myFile.length()];
+							fis = new FileInputStream(myFile);
+							bis = new BufferedInputStream(fis);
+							bis.read(mybytearray,0,mybytearray.length);	
+
+							//System.out.println(messages[0]);
+							//sends EOF on outputstream so that new outputstream can be opened
+							//sock.shutdownOutput();
+
+							// send data to other device from bytearray
+							OutputStream os = sock.getOutputStream();
+							os.write(mybytearray,0,mybytearray.length);
+							os.flush();
+
+							//send EOF of data stream
+							//sock.shutdownOutput();
+							System.out.println("sent File, receiving text message");
+
+							//receive message from other device
+							ObjectInputStream ois2 = new ObjectInputStream(sock.getInputStream());
+							//ois2.skip(Long.MAX_VALUE);
+							receivedmessage = (String) ois2.readObject();
+							System.out.println("from other device: " + receivedmessage);
+							messages = receivedmessage.split("-");
 						}
 						
+						notifyUser("all files transferred...");
+						System.out.println("all files transferred...");
 
-						
-						//house cleaning of streams and socket
-						bis.close();
-						ois.close();
-						fis.close();									
-						sock.close();
 
 					}
 				}catch (UnknownHostException e) {
 					System.out.println("Unknown host exception");
 					e.printStackTrace();
 				} catch (IOException e) {
-					System.out.println("Error receiving file, IOException");
+					System.out.println("Error sending file, IOException");
 					e.printStackTrace();
 				} catch (ClassNotFoundException e) {
 					System.out.println("Error receiving confirmation, ClassNotException");
 					e.printStackTrace();
+				}
+				finally{
+					System.out.println("entered finally block");
+					//house cleaning of streams and socket
+					notifyUser("closing connections");
+					try{
+					bis.close();
+					ois.close();
+					fis.close();									
+					sock.close();
+					
+					
+					} catch(IOException e){
+						System.out.println("Error closing streams, IOException");
+						e.printStackTrace();
+					}
 				}
 			}
 		};
@@ -299,11 +324,14 @@ public class DnssdDiscovery extends Activity {
 					//Opening The socket & sending the file----------------------------------------------------------------------------------------
 					//System.out.println("Starting file sending process");  		
 
-					Socket connection;       		
+					Socket connection = null;
+					ObjectOutputStream oos = null;
+					BufferedOutputStream bos = null;
+					FileOutputStream fos= null;
 
 					try {
 						//file size hardcoded
-						int filesize = 1200000;
+						int filesize = 900000;
 						long start = System.currentTimeMillis();
 						int bytesRead, current = 0;
 						
@@ -311,38 +339,50 @@ public class DnssdDiscovery extends Activity {
 						int currentFile = 0;
 						
 						connection = new Socket (address, port);  		
-						byte [] mybytearray = new byte [filesize];
-						
-						ObjectOutputStream oos = null;
-						BufferedOutputStream bos = null;
-						FileOutputStream fos= null;
+						byte [] mybytearray = new byte [filesize];						
+
 						
 						while(filesLeft > 0){
 
 							//Sending message to device
-							String message = "get-" + fileList[currentFile++];;
+							String message = "get-" + fileList[currentFile++];
 							
 							oos = new ObjectOutputStream(connection.getOutputStream());
 							oos.writeObject(message);
 							oos.flush();
-							System.out.println("Attempting to get db file");
+							
+							System.out.println("getting file: " + fileList[currentFile-1]);
 							
 							//stream managements
 							InputStream is = connection.getInputStream();
-							System.out.println("inputstream instantiated: ");						
-							fos = new FileOutputStream(getFilesDir() + "/received.txt");
+							System.out.println("inputstream instantiated: ");
+							
+							File receivedFile = new File(getFilesDir(), "/received" + currentFile + ".txt");
+							
+							fos = new FileOutputStream(receivedFile);
 							bos = new BufferedOutputStream(fos);
 
 							//receive data from stream
-							bytesRead = is.read(mybytearray,0,mybytearray.length);
+							System.out.println("data reading started");
+							int count;
+							
+							while ((count = is.read(mybytearray)) >= 0) {
+								//System.out.println(count);
+								is.read(mybytearray, count, (mybytearray.length-count));
+								bos.write(mybytearray, 0, count);
+							}
+							
+							/*bytesRead = is.read(mybytearray, 0 , mybytearray.length);
 							current = bytesRead;
 							do {							
 								bytesRead = is.read(mybytearray, current, (mybytearray.length-current));						
 								if(bytesRead >= 0)
 									current += bytesRead;						
-							} while(bytesRead > -1);
+							} while(bytesRead > -1);*/
+							System.out.println("Data reading complete");
+							
 							//write data to array
-							bos.write(mybytearray, 0 , current);
+							//bos.write(mybytearray, 0 , current);
 							bos.flush();
 							long end = System.currentTimeMillis();
 							System.out.println("time taken = " + String.valueOf(end-start) + "ms");
@@ -350,19 +390,11 @@ public class DnssdDiscovery extends Activity {
 						}
 					    
 						//Sending message to device to end session
-						String message = "finish";
+						String message = "finish-xx";
 						
 						oos = new ObjectOutputStream(connection.getOutputStream());
 						oos.writeObject(message);
 						oos.flush();
-						notifyUser("closing connections");
-					    
-					    //house cleaning
-						oos.close();
-						bos.close();
-						fos.close();
-						connection.close();
-						
 						
 						
 					} catch (FileNotFoundException e) {
@@ -374,14 +406,33 @@ public class DnssdDiscovery extends Activity {
 					} catch (IOException e) {
 						System.out.println("IOException!");
 						e.printStackTrace();
-					}  
+					}
+					finally{
+						//house cleaning of streams and socket
+						try{
+							
+							notifyUser("closing connections");
+							
+							oos.close();
+							bos.close();
+							fos.close();
+							connection.close();
+							
+						
+						} catch(IOException e){
+							System.out.println("Error closing streams, IOException");
+							e.printStackTrace();
+						}
+					}
 				}
 			};
 			fileSending.start();
 		}
 	
 	//write a string to screen
-    private void notifyUser(final String msg) {
+ 
+	//print text to screen
+	private void notifyUser(final String msg) {
     	
       handler.postDelayed(new Runnable() {
             public void run() {
@@ -402,14 +453,15 @@ public class DnssdDiscovery extends Activity {
     	
     	try {
     		byte[] data = text.getBytes("UTF8");    		
-			file.createNewFile();					
+			file.createNewFile();
+			file2.createNewFile();
 			if(file.exists() && file2.exists())
 			{
 			     OutputStream fo = new FileOutputStream(file);              
 			     fo.write(data);
 			     fo.close();
 			     
-			     OutputStream fo2 = new FileOutputStream(file);              
+			     OutputStream fo2 = new FileOutputStream(file2);              
 			     fo2.write(data);
 			     fo2.close();
 			     System.out.println("2 files created: ");
