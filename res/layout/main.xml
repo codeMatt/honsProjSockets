@@ -15,11 +15,14 @@
         	android:layout_width="wrap_content"
         	android:layout_height="wrap_content"
         	android:text="@string/register_button" />
-    	<EditText android:id="@+id/nameString"
-            android:layout_width="245dp"
-            android:layout_height="wrap_content"
-            android:text="@string/name_string"
-            android:inputType="text" />	
+
+    	<EditText
+    	    android:id="@+id/nameString"
+    	    android:layout_width="200dp"
+    	    android:layout_height="wrap_content"
+    	    android:inputType="text"
+    	    android:text="@string/name_string" />
+	
 	</LinearLayout>
 	
 	<LinearLayout
