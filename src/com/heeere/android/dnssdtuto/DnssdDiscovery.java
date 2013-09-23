@@ -16,6 +16,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import javax.jmdns.JmDNS;
@@ -184,18 +185,16 @@ public class DnssdDiscovery extends Activity {
         }
     }
 	
-	//method to show the ip from the wifimanager
-	
 	//method to show the IP of the device through the wifimanager
 	public void showIP(){
 		//print out the IP address of the local device
+		/*
 		WifiManager wim= (WifiManager) getSystemService(WIFI_SERVICE);
 		List<WifiConfiguration> l =  wim.getConfiguredNetworks();
 		WifiConfiguration wc = l.get(0); 
-		notifyUser("\n"+ Formatter.formatIpAddress(wim.getConnectionInfo().getIpAddress()));
+		notifyUser("\n"+ Formatter.formatIpAddress(wim.getConnectionInfo().getIpAddress()));*/
 	}
-	
-	
+
 	/* Checks if external storage is available for read and write */
 	public boolean isExternalStorageWritable() {
 	    String state = Environment.getExternalStorageState();
@@ -223,7 +222,7 @@ public class DnssdDiscovery extends Activity {
 			public void run(){
 				
 				Socket sock = null;
-				ObjectInputStream ois = null;
+				BufferedInputStream ois = null;
 				FileInputStream fis = null;
 				BufferedInputStream bis = null;
 				
@@ -233,25 +232,25 @@ public class DnssdDiscovery extends Activity {
 						//accept a socket connection from remote location
 						sock = connection.accept();
 						notifyUser("New socket accepted");
+						File path = getFilesDir();
+						String[] messages = new String[2];
 						
 						//receive message from other device
-						ois = new ObjectInputStream(sock.getInputStream());
-						//ois.skip(Long.MAX_VALUE);
-						String receivedmessage = (String) ois.readObject();
-						System.out.println("from other device: " + receivedmessage);
-						String[] messages = receivedmessage.split("-");
-						
-						File path = getFilesDir();
+						ois = new BufferedInputStream(sock.getInputStream());						
+
+						messages = getMessagesFromDevice(ois);					
 						
 						while(!(messages[0].equals("finish"))){
 
 							//set up file
 							path.mkdirs();
 							File myFile = new File (path, messages[1]);
-							//System.out.println("File exists? " + myFile.exists());
-
+							int fileLength = (int)myFile.length();
+							byte[] fileSize = getByteFromInt(fileLength);
+							
+							
 							// read data from file into byte array
-							byte [] mybytearray = new byte [(int)myFile.length()];
+							byte [] mybytearray = new byte [fileLength];
 							fis = new FileInputStream(myFile);
 							bis = new BufferedInputStream(fis, 1024);
 							bis.read(mybytearray,0,mybytearray.length);	
@@ -260,25 +259,30 @@ public class DnssdDiscovery extends Activity {
 
 							// send data to other device from bytearray
 							OutputStream os = sock.getOutputStream();
-							os.write(mybytearray,0,mybytearray.length);	
+							os.write(fileSize, 0 , 4);
+							os.write(mybytearray,0,mybytearray.length);
+							os.write("\r\n".getBytes());
 							os.flush();
 
 							//send EOF of data stream
-							sock.shutdownOutput();
+							//sock.shutdownOutput();
 							System.out.println("sent File, receiving text message");
 
 							//receive message from other device
-							ObjectInputStream ois2 = new ObjectInputStream(sock.getInputStream());
-							//ois2.skip(Long.MAX_VALUE);
-							receivedmessage = (String) ois2.readObject();
-							System.out.println("from other device: " + receivedmessage);
-							messages = receivedmessage.split("-");
+							messages = getMessagesFromDevice(ois);
 						}
 						
 						notifyUser("all files transferred...");
 						System.out.println("all files transferred...");
 
-
+						//house cleaning of streams and socket
+						System.out.println("closing connections");
+						notifyUser("closing connections");
+			
+						bis.close();
+						ois.close();
+						fis.close();									
+						sock.close();
 					}
 				}catch (UnknownHostException e) {
 					System.out.println("Unknown host exception");
@@ -286,25 +290,7 @@ public class DnssdDiscovery extends Activity {
 				} catch (IOException e) {
 					System.out.println("Error sending file, IOException");
 					e.printStackTrace();
-				} catch (ClassNotFoundException e) {
-					System.out.println("Error receiving confirmation, ClassNotException");
-					e.printStackTrace();
 				}
-				
-					//house cleaning of streams and socket
-					notifyUser("closing connections");
-					try{
-					bis.close();
-					ois.close();
-					fis.close();									
-					sock.close();
-					
-					
-					} catch(IOException e){
-						System.out.println("Error closing streams, IOException");
-						e.printStackTrace();
-					}
-				
 			}
 		};
 		fileReceiving.start();
@@ -323,13 +309,13 @@ public class DnssdDiscovery extends Activity {
 					//System.out.println("Starting file sending process");  		
 
 					Socket connection = null;
-					ObjectOutputStream oos = null;
+					BufferedOutputStream oos = null;
 					BufferedOutputStream bos = null;
 					FileOutputStream fos= null;
 
 					try {
 						//file size hardcoded
-						int filesize = 900000;
+						
 						long start = System.currentTimeMillis();
 						int bytesRead, current = 0;
 						
@@ -337,19 +323,23 @@ public class DnssdDiscovery extends Activity {
 						int currentFile = 0;
 						
 						connection = new Socket (address, port);  		
-						byte [] mybytearray = new byte [filesize];						
+						byte [] mybytearray;						
 
 						
 						while(filesLeft > 0){
 
-							//Sending message to device
-							String message = "get-" + fileList[currentFile++];
+							//Sending messages to device 
+							//including what action to be taken, the length of the filename and the filename
+							byte[] action = {1};
+							byte[]fileName = fileList[currentFile++].getBytes();
+							int filenameLength = fileName.length;							
+							byte[] nameLength = ByteBuffer.allocate(4).putInt(filenameLength).array();
 							
-							oos = new ObjectOutputStream(connection.getOutputStream());
-							oos.writeObject(message);
+							oos = new BufferedOutputStream(connection.getOutputStream());
+							oos.write(action, 0 , 1);
+							oos.write(nameLength,0,4);
+							oos.write(fileName,0, filenameLength);
 							oos.flush();
-							
-							System.out.println("getting file: " + fileList[currentFile-1]);
 							
 							//stream managements
 							InputStream is = connection.getInputStream();
@@ -364,7 +354,14 @@ public class DnssdDiscovery extends Activity {
 							System.out.println("data reading started");
 							int count;
 							
-							while ((count = is.read(mybytearray)) >= 0) {
+							byte[] fileSizeByte= new byte[4];
+							
+							is.read(fileSizeByte, 0 , 4);
+							
+							int fileSize = getIntFromByte(fileSizeByte);
+							mybytearray = new byte [fileSize];
+							
+							while ((count = is.read(mybytearray)) < fileSize) {
 								//System.out.println(count);
 								is.read(mybytearray, count, (mybytearray.length-count));
 								bos.write(mybytearray, 0, count);
@@ -392,10 +389,8 @@ public class DnssdDiscovery extends Activity {
 						}
 					    
 						//Sending message to device to end session
-						String message = "finish-xx";
-						
-						oos = new ObjectOutputStream(connection.getOutputStream());
-						oos.writeObject(message);
+						byte[] action = {0};
+						oos.write(action,0,1);
 						oos.flush();
 						
 						
@@ -409,7 +404,7 @@ public class DnssdDiscovery extends Activity {
 						System.out.println("IOException!");
 						e.printStackTrace();
 					}
-					finally{
+					
 						//house cleaning of streams and socket
 						try{
 							
@@ -425,7 +420,7 @@ public class DnssdDiscovery extends Activity {
 							System.out.println("Error closing streams, IOException");
 							e.printStackTrace();
 						}
-					}
+					
 				}
 			};
 			fileSending.start();
@@ -444,7 +439,68 @@ public class DnssdDiscovery extends Activity {
             }, 1);
 
     }
-    
+ 
+	//convert a byte[] into an integer
+	private int getIntFromByte(byte[] array){
+		
+		System.out.println("in getIntFromByte, array size = " + array.length);
+		ByteBuffer buffer = ByteBuffer.allocate(array.length);
+		buffer.put(array);
+		buffer.flip();
+		int value = buffer.getInt();		
+		buffer.rewind();
+				
+		return value;
+	}
+	
+	//convert an integer into a byte[]
+	private byte[] getByteFromInt(int number){
+		
+		ByteBuffer buffer = ByteBuffer.allocate(4);
+		buffer.putInt(number);		
+		byte[] array = buffer.array();
+		
+		return array;
+	}
+	
+	//receive the input from another device according to the protocol
+	private String[] getMessagesFromDevice(BufferedInputStream ois){
+		
+		String[] messages = new String[2];
+
+		try{
+			byte[] intention = new byte[1];							
+			ois.read(intention, 0 , 1);
+
+			if(intention[0] == 1){							
+
+				messages[0] = "get";
+				byte[] fileNameLength= new byte[4];	
+				ois.read(fileNameLength,0,4);			
+
+				int fileNameLengthInt = getIntFromByte(fileNameLength);
+
+				byte[] filename = new byte[fileNameLengthInt];
+				ois.read(filename, 0 , fileNameLengthInt);
+
+				messages[1] = new String (filename);
+
+			}
+			else{
+				messages[0] = "finish";
+				messages[1] = "";
+			}
+		}catch(IOException e){
+			System.out.println("Error recieving messages");
+			messages[0] = "finish";
+			messages[1] = "";
+		}
+		
+		return messages;
+		
+	}
+	
+	
     private void createDummyFile(){
     	
     	
