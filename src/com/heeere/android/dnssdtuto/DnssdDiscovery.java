@@ -1,16 +1,16 @@
 package com.heeere.android.dnssdtuto;
+//This is main activity class in an android app that registers a jmdns service
+//and transfers files between registered devices
+//matthew watkins
+//August 2013
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -18,24 +18,24 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.List;
 import javax.jmdns.JmDNS;
 import javax.jmdns.ServiceEvent;
 import javax.jmdns.ServiceInfo;
 import javax.jmdns.ServiceListener;
 import android.app.Activity;
-import android.content.Context;
-import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Environment;
-import android.text.format.Formatter;
+import android.bluetooth.*;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.Spinner;
 import android.widget.TextView;
 
 public class DnssdDiscovery extends Activity {
@@ -45,8 +45,10 @@ public class DnssdDiscovery extends Activity {
     android.os.Handler handler = new android.os.Handler();
     EditText nameText;
     ArrayList<DeviceInstance> deviceList = new ArrayList<DeviceInstance> ();
-    int deviceCount = 0;
-    ArrayAdapter<DeviceInstance> spinnerArrayAdapter;       
+    int deviceCount = 0, ipAddress;
+    ArrayAdapter<DeviceInstance> spinnerArrayAdapter; 
+    private final static int REQUEST_ENABLE_BT = 1;
+    ServerSocketHandler FileServer;
     
     //called when the activity is first created.
     @Override
@@ -55,12 +57,14 @@ public class DnssdDiscovery extends Activity {
         setContentView(R.layout.main);
         
         //acquire lock for device discovery
-        android.net.wifi.WifiManager wifi = (android.net.wifi.WifiManager)
+        WifiManager wifi = (WifiManager)
         		getSystemService(android.content.Context.WIFI_SERVICE);
         
         lock = wifi.createMulticastLock("mylockthereturn");
         lock.setReferenceCounted(true);
         lock.acquire();
+        
+        ipAddress = wifi.getConnectionInfo().getIpAddress();
 
         //UI Features------------------------------------------------
         //enter device name textbox
@@ -72,34 +76,37 @@ public class DnssdDiscovery extends Activity {
         	 
 			@Override
 			public void onClick(View arg0) {
-				//setName();
+				
 				deviceName = (String)nameText.getText().toString();
-				try {
+
+				FileServer = new ServerSocketHandler(getFilesDir());
+				FileServer.start();
+				showIP();
+				
+				/*try {
 					register();
 				} catch (IOException e) {
+					System.out.println("Error parsing name");
 					e.printStackTrace();
-				}
-				showIP();
+				}*/
 			} 
 		});      
         
         //get file button  ------------------------------
         Button getFileButton = (Button) findViewById (R.id.button2);
-        getFileButton.setOnClickListener(new OnClickListener() {
-       	 
+        getFileButton.setOnClickListener(new OnClickListener() {       	 
 			@Override
 			public void onClick(View arg0) {
-				try{
-					
 				EditText address = (EditText) findViewById (R.id.addressString);   
-				String[] tempAddress = address.getText().toString().split(":");				
-				//int port = Integer.parseInt(tempAddress[1]);
+				String tempAddress = address.getText().toString();				
 				String[] files = {"newTestFile.txt"};
-				initiateFileTransfer(tempAddress[0], 5000, files);
 				
-				}catch(Exception e){
-					notifyUser("Please enter the address correctly");
-				}
+				
+				SocketClient getFile = new SocketClient(tempAddress, getFilesDir(), files, 5000);
+				
+				getFile.start();
+				
+				//initiateFileTransfer(tempAddress, 5000, files);				
 			} 
 		});       
  
@@ -109,49 +116,52 @@ public class DnssdDiscovery extends Activity {
        	 
 			@Override
 			public void onClick(View arg0) {	
-				try{
 					
 				EditText address = (EditText) findViewById (R.id.addressString);
 				String[] files = { "newTestFile.txt", "secondFile.txt"};				
-				String[] tempAddress = address.getText().toString().split(":");				
-				//int port = Integer.parseInt(tempAddress[1]);				
-				initiateFileTransfer(tempAddress[0], 5000, files);
+				String tempAddress = address.getText().toString();
 				
-				}catch(Exception e){
-					notifyUser("Please enter the address correctly");
-				}
-			} 
+				
+				SocketClient getFiles = new SocketClient(tempAddress, getFilesDir(), files, 5000);
+				
+				getFiles.start();
+				
+
+				
+				//initiateFileTransfer(tempAddress, 5000, files);
+				} 
 		});
        
-        new Thread(){
+        //start the jmdns initialisation, separate thread as networking cannot be done on main thread
+        /*new Thread(){
         	public void run() {        		
         		setUp();        		
         		}
-        	}.start();
+        	}.start();*/
         	
        createDummyFile();
-        //-------------------------------------------------------------
-        
-        //handler.postDelayed(new Runnable() {
-           // public void run() {
-            //    setUp();
-           // }
-           // }, 1000);
-
-    }    //Called when the activity is first created.
+    }   
 
     private String type = "_share._tcp.local.";
     private JmDNS jmdns = null;
     private ServiceListener listener = null;
     private ServiceInfo serviceInfo;
-    private String deviceName;
+    private String deviceName = "name";
+    private ArrayList<String> bluetoothDevices;
+    BluetoothAdapter bluetooth;
+    BroadcastReceiver receiver;
     
     //method to set up the jmdns service and service listener
 	private void setUp() {
-		        
+		        	
         try {
-
-            jmdns = JmDNS.create(); 
+        	
+        	InetAddress setUpAddress = InetAddress.getByAddress(convertToByteAddress(ipAddress));
+        	
+            jmdns = JmDNS.create(setUpAddress);
+            System.out.println("create complete");
+            registerJmdns();
+            System.out.println("starting listening");
             jmdns.addServiceListener(type, listener = new ServiceListener() {
             	
             	public String[] serviceUrls = null;
@@ -159,9 +169,7 @@ public class DnssdDiscovery extends Activity {
                 @Override
                 public void serviceResolved(ServiceEvent ev) {                	                   
                 	serviceUrls = ev.getInfo().getURLs();    
-                	//addDeviceToList(ev.getName(), serviceUrls[0], ev.getInfo().getPort());
                 	deviceList.add(new DeviceInstance (ev.getName(), serviceUrls[0], ev.getInfo().getPort()));
-                	
                 	notifyUser("New Service Available: " + ev.getName() + " Address: " + serviceUrls[0]);
                 }
 
@@ -177,7 +185,7 @@ public class DnssdDiscovery extends Activity {
                     jmdns.requestServiceInfo(event.getType(), event.getName(), 1);
                 }
             });
-            
+            System.out.println("completed listening");
             
         } catch (IOException e) {
             e.printStackTrace();
@@ -185,127 +193,145 @@ public class DnssdDiscovery extends Activity {
         }
     }
 	
-	//method to show the IP of the device through the wifimanager
-	public void showIP(){
-		//print out the IP address of the local device
-		/*
-		WifiManager wim= (WifiManager) getSystemService(WIFI_SERVICE);
-		List<WifiConfiguration> l =  wim.getConfiguredNetworks();
-		WifiConfiguration wc = l.get(0); 
-		notifyUser("\n"+ Formatter.formatIpAddress(wim.getConnectionInfo().getIpAddress()));*/
-	}
-
-	/* Checks if external storage is available for read and write */
-	public boolean isExternalStorageWritable() {
+	// Checks if external storage is available for read and write
+	private boolean isExternalStorageWritable() {
 	    String state = Environment.getExternalStorageState();
 	    if (Environment.MEDIA_MOUNTED.equals(state)) {
 	        return true;
 	    }
 	    return false;
 	}
+	
+	//convert integer ip address into byte array
+	private byte[] convertToByteAddress(int address){
+		byte[] byAddress;	
+		byAddress = new byte[] {
+				(byte) (address & 0xff),
+				(byte) (address >> 8 & 0xff),
+				(byte) (address >> 16 & 0xff),
+				(byte) (address >> 24 & 0xff),				
+		};
+		return byAddress;		
+	}
 
+	//method to print out the ip address of 
+	private void showIP(){
+		
+		
+		String address =  (ipAddress & 0xFF ) + "." +
+	               ((ipAddress >> 8 ) & 0xFF) + "." +
+	               ((ipAddress >> 16 ) & 0xFF) + "." +
+	               ( (ipAddress >> 24 ) & 0xFF) ;
+		
+		
+		
+		notifyUser("IP Address: " + address);
+	}
+	
+	//call all the relevant methods for the bluetooth discovery
+	private void initialiseBluetooth(){
+		
+		bluetoothDevices = new ArrayList<String>();
+		
+		if(setUpBluetooth()){
+			discoverBluetoothDevices();
+			bluetoothAdvertiseOn();
+		}
+		else{
+			System.out.println("failed to initialise bluetooth");
+		}
+	}
+	
+	//bluetooth setup method
+	private boolean setUpBluetooth(){
+		
+		bluetooth = BluetoothAdapter.getDefaultAdapter();
+		
+		//get user to enable bluetooth
+		if(!(bluetooth.isEnabled())){
+			Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+		    startActivityForResult(enableBtIntent, REQUEST_ENABLE_BT);
+		}	
+		
+		if(bluetooth != null && bluetooth.isEnabled())
+		{
+		    // Continue with bluetooth setup.
+			bluetooth.setName(deviceName);
+			return true;
+		}
+		else{
+			System.out.println("bluetooth disabled or unavailable!");
+			return false;
+		}
+	}
+	
+	//discover bluetooth devices nearby
+	private void discoverBluetoothDevices(){
+		
+		bluetooth.startDiscovery();
+		
+		// Create a BroadcastReceiver for ACTION_FOUND
+		receiver = new BroadcastReceiver() {
+			
+		    public void onReceive(Context context, Intent intent) {
+		        String action = intent.getAction();
+		        // When discovery finds a device
+		        if (BluetoothDevice.ACTION_FOUND.equals(action)) {
+		        	System.out.println("Found BT DEV");
+		            // Get the BluetoothDevice object from the Intent
+		            BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+		            if(device != null){
+		            	bluetoothDevices.add(device.getName());
+		            	notifyUser("new BT Dev: " + device.getName());
+		            }
+		        }
+		    }
+		};
+		
+		// Register the BroadcastReceiver
+		IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
+		registerReceiver(receiver, filter); // Don't forget to unregister during onDestroy
+		
+	}
+	
+	//make this device discoverable on bluetooth
+	private void bluetoothAdvertiseOn(){
+		
+		//this shows a pop up for bluetoth permission that the user has to input "yes"
+		Intent discoverableIntent = new
+				Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+				discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 0);
+				startActivity(discoverableIntent);
+	}
+	
+	//make this device undiscoverable on bluetooth after 1 second
+	private void bluetoothAdvertiseOff(){
+		
+		//this shows a pop up for bluetoth permission that the user has to input "yes"
+		Intent discoverableIntent = new
+				Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+				discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 1);
+				startActivity(discoverableIntent);
+	}
+	
 	//method to set up the registration of a jmdns service
 	//and the socket host
-	public void register() throws IOException{
-
-		final int port = 5000;
-		
+	private void registerJmdns() throws IOException{
+		final int port = 5000;		
 		//register service on jmdns protocol
-		serviceInfo = ServiceInfo.create("_share._tcp.local.", deviceName, port, "share service");
+		serviceInfo = ServiceInfo.create("_share._tcp.local.", deviceName, port, "share_service");
 		jmdns.registerService(serviceInfo);
-
-		//initialise the socket listener thread that sends file to the port opened
-		Thread fileReceiving = new Thread (){
-
-			private ServerSocket connection = new ServerSocket(port);
-
-			public void run(){
-				
-				Socket sock = null;
-				BufferedInputStream ois = null;
-				FileInputStream fis = null;
-				BufferedInputStream bis = null;
-				
-				try{	
-					while (true) {
-
-						//accept a socket connection from remote location
-						sock = connection.accept();
-						notifyUser("New socket accepted");
-						File path = getFilesDir();
-						String[] messages = new String[2];
-						
-						//receive message from other device
-						ois = new BufferedInputStream(sock.getInputStream());						
-
-						messages = getMessagesFromDevice(ois);					
-						
-						while(!(messages[0].equals("finish"))){
-
-							//set up file
-							path.mkdirs();
-							File myFile = new File (path, messages[1]);
-							int fileLength = (int)myFile.length();
-							byte[] fileSize = getByteFromInt(fileLength);
-							
-							
-							// read data from file into byte array
-							byte [] mybytearray = new byte [fileLength];
-							fis = new FileInputStream(myFile);
-							bis = new BufferedInputStream(fis, 1024);
-							bis.read(mybytearray,0,mybytearray.length);	
-
-							//System.out.println(messages[0]);
-
-							// send data to other device from bytearray
-							OutputStream os = sock.getOutputStream();
-							os.write(fileSize, 0 , 4);
-							os.write(mybytearray,0,mybytearray.length);
-							os.write("\r\n".getBytes());
-							os.flush();
-
-							//send EOF of data stream
-							//sock.shutdownOutput();
-							System.out.println("sent File, receiving text message");
-
-							//receive message from other device
-							messages = getMessagesFromDevice(ois);
-						}
-						
-						notifyUser("all files transferred...");
-						System.out.println("all files transferred...");
-
-						//house cleaning of streams and socket
-						System.out.println("closing connections");
-						notifyUser("closing connections");
-			
-						bis.close();
-						ois.close();
-						fis.close();									
-						sock.close();
-					}
-				}catch (UnknownHostException e) {
-					System.out.println("Unknown host exception");
-					e.printStackTrace();
-				} catch (IOException e) {
-					System.out.println("Error sending file, IOException");
-					e.printStackTrace();
-				}
-			}
-		};
-		fileReceiving.start();
+		System.out.println("registering complete");		
 	}
 
 	//Initialize the socket connection and file transfer
-	public void initiateFileTransfer(final String address, final int port, final String[] fileList){
+	private void initiateFileTransfer(final String address, final int port, final String[] fileList){
 
-			
-			notifyUser("File receiving initiated From: " + address);
-	
+			notifyUser("File receiving initiated From: " + address);	
 			Thread fileSending = new Thread (){
 				public void run(){
 					
-					//Opening The socket & sending the file----------------------------------------------------------------------------------------
+					//Opening The socket & sending the file------------------------------------------------------
 					//System.out.println("Starting file sending process");  		
 
 					Socket connection = null;
@@ -314,18 +340,13 @@ public class DnssdDiscovery extends Activity {
 					FileOutputStream fos= null;
 
 					try {
-						//file size hardcoded
 						
-						long start = System.currentTimeMillis();
-						int bytesRead, current = 0;
-						
+						byte [] mybytearray;
+						long start = System.currentTimeMillis();												
 						int filesLeft = fileList.length;
-						int currentFile = 0;
-						
+						int currentFile = 0;						
 						connection = new Socket (address, port);  		
-						byte [] mybytearray;						
-
-						
+												
 						while(filesLeft > 0){
 
 							//Sending messages to device 
@@ -343,10 +364,17 @@ public class DnssdDiscovery extends Activity {
 							
 							//stream managements
 							InputStream is = connection.getInputStream();
-							System.out.println("inputstream instantiated: ");
+							//System.out.println("inputstream instantiated: ");
 							
-							File receivedFile = new File(getFilesDir(), "/received" + currentFile + ".txt");
+							File receivedFile;
 							
+							if(isExternalStorageWritable()){
+								receivedFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) , "/received_" + currentFile + ".txt");
+							}
+							else{
+								receivedFile = new File(getFilesDir(), "/received_" + fileName + currentFile + ".txt");
+							}
+														
 							fos = new FileOutputStream(receivedFile);
 							bos = new BufferedOutputStream(fos);
 
@@ -359,25 +387,18 @@ public class DnssdDiscovery extends Activity {
 							is.read(fileSizeByte, 0 , 4);
 							
 							int fileSize = getIntFromByte(fileSizeByte);
+							System.out.println("Current file size: " + fileSize);							
 							mybytearray = new byte [fileSize];
 							
+							//read in file (read in exact amount of bytes that the file contains)
 							while ((count = is.read(mybytearray)) < fileSize) {
-								//System.out.println(count);
-								is.read(mybytearray, count, (mybytearray.length-count));
-								bos.write(mybytearray, 0, count);
-								
-								//need to check for end of file somehow
-								//and break out of the loop
-							
+								is.read(mybytearray, count, (mybytearray.length-count));								
 							}
-							
-							/*bytesRead = is.read(mybytearray, 0 , mybytearray.length);
-							current = bytesRead;
-							do {							
-								bytesRead = is.read(mybytearray, current, (mybytearray.length-current));						
-								if(bytesRead >= 0)
-									current += bytesRead;						
-							} while(bytesRead > -1);*/
+							bos.write(mybytearray);//might have to include this write in the loop for bigger files
+												   //would be bos.write(mybytearray, count, (mybytearray.length-count));
+							bos.flush();
+							fos.flush();
+
 							System.out.println("Data reading complete");
 							
 							//write data to array
@@ -406,16 +427,12 @@ public class DnssdDiscovery extends Activity {
 					}
 					
 						//house cleaning of streams and socket
-						try{
-							
-							notifyUser("closing connections");
-							
+						try{							
+							notifyUser("closing connections");							
 							oos.close();
 							bos.close();
 							fos.close();
 							connection.close();
-							
-						
 						} catch(IOException e){
 							System.out.println("Error closing streams, IOException");
 							e.printStackTrace();
@@ -426,8 +443,6 @@ public class DnssdDiscovery extends Activity {
 			fileSending.start();
 		}
 	
-	//write a string to screen
- 
 	//print text to screen
 	private void notifyUser(final String msg) {
     	
@@ -440,10 +455,10 @@ public class DnssdDiscovery extends Activity {
 
     }
  
-	//convert a byte[] into an integer
+	//convert an byte[] into a integer
 	private int getIntFromByte(byte[] array){
 		
-		System.out.println("in getIntFromByte, array size = " + array.length);
+		//System.out.println("in getIntFromByte, array size = " + array.length);
 		ByteBuffer buffer = ByteBuffer.allocate(array.length);
 		buffer.put(array);
 		buffer.flip();
@@ -463,7 +478,7 @@ public class DnssdDiscovery extends Activity {
 		return array;
 	}
 	
-	//receive the input from another device according to the protocol
+	//method to receive a message from a device running the same application
 	private String[] getMessagesFromDevice(BufferedInputStream ois){
 		
 		String[] messages = new String[2];
@@ -499,14 +514,24 @@ public class DnssdDiscovery extends Activity {
 		return messages;
 		
 	}
-	
-	
+
+	//method to make dummy files for file transfers
     private void createDummyFile(){
     	
     	
     	String text = "This is a tester file created in the app dnssddemo";
     	String text2 = "This is a tester file created in the app dnssddemo, it is a longer file than the first file for testing purposes, just for me. I don't like have good grammar";
-		File path = getFilesDir();
+		
+    	File path;
+		
+		if(isExternalStorageWritable()){
+			path = (Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS));
+		}
+		else{
+			path = getFilesDir();
+		}
+    	
+    	
 		File file = new File (path, "newTestFile.txt");
 		File file2 = new File (path, "secondFile.txt");
     	
@@ -542,24 +567,47 @@ public class DnssdDiscovery extends Activity {
     }
 
     @Override
+    //The method to remove the jmdns services when the application ends
     protected void onStop() {
+    	
     	if (jmdns != null) {
-            if (listener != null) {
-                jmdns.removeServiceListener(type, listener);
-                listener = null;
-            }
-            jmdns.unregisterAllServices();
-            try {
-                jmdns.close();
-            } catch (IOException e) {
-                System.out.println("Error closing jmdns");
-                e.printStackTrace();
-            }
-            jmdns = null;
+    		if (listener != null) {
+    			jmdns.removeServiceListener(type, listener);
+    			listener = null;
+    		}
+    		jmdns.unregisterAllServices();
+    		try {
+    			jmdns.close();
+    		} catch (IOException e) {
+    			System.out.println("Error closing jmdns");
+    			e.printStackTrace();
+    		}
+    		jmdns = null;
     	}
+    	
+    	//close server socket connection
+		if(FileServer != null && FileServer.isInterrupted()){
+			try{
+			FileServer.getSocket().close();}
+			catch(IOException ioe){
+				System.out.println("Failed to close server socket");
+			}
+		}
+    	
+    	//turn of discovery
+    	if(bluetooth!=null){
+    		bluetooth.cancelDiscovery();
+    		bluetoothAdvertiseOff();
+    	}
+    	
+    	if(receiver != null)
+    		this.unregisterReceiver(receiver);
+    	
     	//repo.stop();
-        //s.stop();
-        lock.release();
+    	//s.stop();
+    	if(lock.isHeld())
+    		lock.release();
+    	
     	super.onStop();
     }
 }

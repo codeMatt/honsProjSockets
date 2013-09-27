@@ -4,7 +4,7 @@
     <string name="app_name">DnssdDemo</string>
     <string name="register_button">Register</string>
     <string name="name_string">Enter device Name</string>
-    <string name="get_file_1">get file</string>
+    <string name="get_file_1">get db</string>
     <string name="get_file_many">get files</string>
     <string name="Device_List">Devices</string>
 </resources>
