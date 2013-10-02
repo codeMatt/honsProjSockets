@@ -143,10 +143,10 @@ public class SocketClient extends Thread {
 			bos.close();
 			fos.close();
 			connection.close();
-		} catch(IOException e){
+		}
+		catch(IOException e){
 			System.out.println("Error closing streams, IOException");
-			e.printStackTrace();
-			
+			e.printStackTrace();			
 		} catch(NullPointerException npe){
 			npe.printStackTrace();
 		}

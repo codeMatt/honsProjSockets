@@ -240,7 +240,8 @@ public final class DNSOutgoing extends DNSMessage {
      * @exception IOException
      */
     public void addQuestion(DNSQuestion rec) throws IOException {
-        MessageOutputStream record = new MessageOutputStream(512, this);
+        @SuppressWarnings("resource")
+		MessageOutputStream record = new MessageOutputStream(512, this);
         record.writeQuestion(rec);
         byte[] byteArray = record.toByteArray();
         if (byteArray.length < this.availableSpace()) {
@@ -274,7 +275,8 @@ public final class DNSOutgoing extends DNSMessage {
     public void addAnswer(DNSRecord rec, long now) throws IOException {
         if (rec != null) {
             if ((now == 0) || !rec.isExpired(now)) {
-                MessageOutputStream record = new MessageOutputStream(512, this);
+                @SuppressWarnings("resource")
+				MessageOutputStream record = new MessageOutputStream(512, this);
                 record.writeRecord(rec, now);
                 byte[] byteArray = record.toByteArray();
                 if (byteArray.length < this.availableSpace()) {
@@ -294,7 +296,8 @@ public final class DNSOutgoing extends DNSMessage {
      * @exception IOException
      */
     public void addAuthorativeAnswer(DNSRecord rec) throws IOException {
-        MessageOutputStream record = new MessageOutputStream(512, this);
+        @SuppressWarnings("resource")
+		MessageOutputStream record = new MessageOutputStream(512, this);
         record.writeRecord(rec, 0);
         byte[] byteArray = record.toByteArray();
         if (byteArray.length < this.availableSpace()) {
@@ -313,7 +316,8 @@ public final class DNSOutgoing extends DNSMessage {
      * @exception IOException
      */
     public void addAdditionalAnswer(DNSIncoming in, DNSRecord rec) throws IOException {
-        MessageOutputStream record = new MessageOutputStream(512, this);
+        @SuppressWarnings("resource")
+		MessageOutputStream record = new MessageOutputStream(512, this);
         record.writeRecord(rec, 0);
         byte[] byteArray = record.toByteArray();
         if (byteArray.length < this.availableSpace()) {
@@ -333,7 +337,8 @@ public final class DNSOutgoing extends DNSMessage {
         long now = System.currentTimeMillis(); // System.currentTimeMillis()
         _names.clear();
 
-        MessageOutputStream message = new MessageOutputStream(_maxUDPPayload, this);
+        @SuppressWarnings("resource")
+		MessageOutputStream message = new MessageOutputStream(_maxUDPPayload, this);
         message.writeShort(_multicast ? 0 : this.getId());
         message.writeShort(this.getFlags());
         message.writeShort(this.getNumberOfQuestions());

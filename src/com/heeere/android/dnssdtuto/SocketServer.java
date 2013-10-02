@@ -30,6 +30,8 @@ public class SocketServer implements Runnable{
 	//run method of thread
 	public void run(){
 
+		System.out.println("Socket server instance started");
+		
 		//set up streams
 		BufferedInputStream ois = null;
 		FileInputStream fis = null;

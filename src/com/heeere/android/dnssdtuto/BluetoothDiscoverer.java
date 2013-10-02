@@ -8,8 +8,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Looper;
 
-public class BluetoothDiscoverer implements Runnable{
+public class BluetoothDiscoverer extends Thread {
 	
     private ArrayList<String> bluetoothDevices;
     BluetoothAdapter bluetooth;
@@ -39,6 +40,8 @@ public class BluetoothDiscoverer implements Runnable{
 	
 	//bluetooth
 	private boolean setUpBluetooth(){
+		
+		Looper.prepare();
 		
 		bluetooth = BluetoothAdapter.getDefaultAdapter();
 		
@@ -79,8 +82,7 @@ public class BluetoothDiscoverer implements Runnable{
 		            }
 		        }
 		    }
-		};
-		
+		};		
 		// Register the BroadcastReceiver
 		IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
 		((Activity) bContext).registerReceiver(receiver, filter); // Don't forget to unregister during onDestroy
@@ -115,6 +117,16 @@ public class BluetoothDiscoverer implements Runnable{
 				return true;
 		}		
 		return false;
+	}
+	
+	public void shutdownBluetooth(){
+		
+    	if(bluetooth!=null){
+    		bluetooth.cancelDiscovery();
+    		//bluetoothAdvertiseOff();
+    		if(receiver!=null)
+    			((Activity) bContext).unregisterReceiver(receiver);
+    	}
 	}
 	
 }
