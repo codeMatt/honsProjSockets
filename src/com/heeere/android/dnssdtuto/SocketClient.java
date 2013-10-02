@@ -50,7 +50,7 @@ public class SocketClient extends Thread {
 	//Initialize the socket connection and file transfer
 	public void run(/*final String address, final int port, final String[] fileList*/){
 
-		System.out.println("File receiving initiated From: " + address);	
+		System.out.println("File receiving initiated From:" + address);	
 
 
 		//Opening The socket & sending the file------------------------------------------------------

@@ -41,10 +41,9 @@
         	android:layout_height="fill_parent"
         	android:text="@string/get_file_many" />
 		
-		<EditText android:id="@+id/addressString"
-            android:layout_width="150dp"
-            android:layout_height="fill_parent"
-            android:inputType="text" />
+		<Spinner android:id="@+id/device_spinner"
+            android:layout_width="match_parent"
+            android:layout_height="fill_parent"/>
 
 	 </LinearLayout>
 	

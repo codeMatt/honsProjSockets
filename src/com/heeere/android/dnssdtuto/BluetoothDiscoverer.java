@@ -64,8 +64,10 @@ public class BluetoothDiscoverer extends Thread {
 	
 	//discover bluetooth devices nearby
 	private void discoverBluetoothDevices(){
-		
+	
+		bluetoothDevices.clear();
 		bluetooth.startDiscovery();
+
 		
 		// Create a BroadcastReceiver for ACTION_FOUND
 		receiver = new BroadcastReceiver() {
@@ -111,6 +113,8 @@ public class BluetoothDiscoverer extends Thread {
 	
 	//compare the jmdns found device name to the bluetooth discovered devices
 	public boolean collocated(String name){		
+		
+		discoverBluetoothDevices();
 		
 		for(String device : bluetoothDevices){
 			if (device.equals(name))

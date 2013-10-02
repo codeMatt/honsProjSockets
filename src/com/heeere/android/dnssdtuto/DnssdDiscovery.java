@@ -25,6 +25,7 @@ import android.view.View.OnClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 public class DnssdDiscovery extends Activity {
@@ -33,12 +34,14 @@ public class DnssdDiscovery extends Activity {
     private android.net.wifi.WifiManager.MulticastLock lock;
     private android.os.Handler handler = new android.os.Handler();
     private EditText nameText;
-    private ArrayList<DeviceInstance> deviceList = new ArrayList<DeviceInstance> ();
     private int  ipAddress;
     private ServerSocketHandler FileServer;
     private BluetoothDiscoverer bTDisc;
     private Context context;
     private File path;
+	private ArrayAdapter<DeviceInstance> listAdapter;
+	private ArrayList<DeviceInstance> deviceList = new ArrayList<DeviceInstance>();
+	private Spinner deviceSpinner;
     
     //called when the activity is first created.
     @Override
@@ -99,8 +102,10 @@ public class DnssdDiscovery extends Activity {
         getFileButton.setOnClickListener(new OnClickListener() {       	 
 			@Override
 			public void onClick(View arg0) {
-				EditText address = (EditText) findViewById (R.id.addressString);   
-				String tempAddress = address.getText().toString();				
+				//EditText address = (EditText) findViewById (R.id.addressString);   
+				//String tempAddress = address.getText().toString();
+				DeviceInstance d = (DeviceInstance) deviceSpinner.getSelectedItem();
+				String tempAddress = d.getAddress();
 				String[] files = {"newTestFile.txt"};		
 				
 				SocketClient getFile = new SocketClient(tempAddress, getFilesDir(), files, 5000);
@@ -117,11 +122,11 @@ public class DnssdDiscovery extends Activity {
 			@Override
 			public void onClick(View arg0) {	
 					
-				EditText address = (EditText) findViewById (R.id.addressString);
-				String[] files = { "newTestFile.txt", "secondFile.txt"};				
-				String tempAddress = address.getText().toString();
-				
-				
+				//EditText address = (EditText) findViewById (R.id.addressString);
+				//String tempAddress = address.getText().toString();
+				DeviceInstance d = (DeviceInstance) deviceSpinner.getSelectedItem();
+				String tempAddress = d.getAddress();				
+				String[] files = { "newTestFile.txt", "secondFile.txt"};
 				SocketClient getFiles = new SocketClient(tempAddress, getFilesDir(), files, 5000);
 				
 				getFiles.start();
@@ -129,7 +134,13 @@ public class DnssdDiscovery extends Activity {
 				} 
 		}); 
         
-        
+		//set up the spinner to its arraylist		
+		deviceSpinner = ((Spinner)findViewById(R.id.device_spinner));
+
+		listAdapter = new ArrayAdapter<DeviceInstance>(this, android.R.layout.simple_spinner_item, deviceList);
+		listAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+		deviceSpinner.setAdapter(listAdapter);
         
         	
        createDummyFile();
@@ -160,13 +171,16 @@ public class DnssdDiscovery extends Activity {
                 @Override
                 public void serviceResolved(ServiceEvent ev) {                	                   
                 	serviceUrls = ev.getInfo().getURLs();    
-                	deviceList.add(new DeviceInstance (ev.getName(), serviceUrls[0], ev.getInfo().getPort()));
-                	notifyUser("New Service Available: " + ev.getName() + " Address: " + serviceUrls[0]);
+                	deviceList.add(new DeviceInstance (ev.getName(), serviceUrls[0].substring(7, serviceUrls[0].length() -5), ev.getInfo().getPort()));
+                	listAdapter.notifyDataSetChanged();
+                	notifyUser("New Service Available: " + ev.getName());
                 }
 
                 @Override
                 public void serviceRemoved(ServiceEvent ev) {
                 	notifyUser("Service removed: " + ev.getName());
+                	deviceList.remove(new DeviceInstance (ev.getName(), serviceUrls[0], ev.getInfo().getPort()));
+                	listAdapter.notifyDataSetChanged();
                 }
 
                 @Override
