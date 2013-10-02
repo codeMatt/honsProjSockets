@@ -128,6 +128,9 @@ public class DnssdDiscovery extends Activity {
 				
 				} 
 		}); 
+        
+        
+        
         	
        createDummyFile();
     }   
