@@ -33,12 +33,12 @@
 		<Button
        		android:id="@+id/button2"
         	android:layout_width="75dp"
-        	android:layout_height="wrap_content"
+        	android:layout_height="fill_parent"
         	android:text="@string/get_file_1" />
 		<Button
        		android:id="@+id/button3"
         	android:layout_width="75dp"
-        	android:layout_height="wrap_content"
+        	android:layout_height="fill_parent"
         	android:text="@string/get_file_many" />
 		
 		<EditText android:id="@+id/addressString"
