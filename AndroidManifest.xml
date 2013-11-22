@@ -14,7 +14,7 @@
     android:targetSdkVersion="17" />
     
     <application android:icon="@drawable/icon" android:label="@string/app_name">
-        <activity android:name=".DnssdDiscovery"
+        <activity android:name=".SocketTransfer"
                   android:label="@string/app_name"
                   android:screenOrientation="portrait">
             <intent-filter>

@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="hello">application notification log:\n----------------------------------------------------</string>
-    <string name="app_name">Jmdns-Socket-UCTHons</string>
-    <string name="register_button">Register</string>
-    <string name="name_string">Enter device Name</string>
+    <string name="app_name">Socket Transfer</string>
+    <string name="register_button">Start Server</string>
+    <string name="name_string">John</string>
     <string name="get_file_1">get db</string>
-    <string name="get_file_many">get files</string>
+    <string name="get_file_many">Retrieve Files</string>
+    <string name="download_bar">Download Idle</string>
     <string name="Device_List">Devices</string>
 </resources>

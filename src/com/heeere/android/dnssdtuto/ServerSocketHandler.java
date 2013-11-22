@@ -5,23 +5,26 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.ArrayList;
-import java.util.List;
+import javax.net.ServerSocketFactory;
+import android.widget.TextView;
 
 public class ServerSocketHandler extends Thread{
 	
-	private List<SocketServer> serverConnections = new ArrayList<SocketServer>();
 	private ServerSocket connection;
 	private File path;
-	private int connections;
-	Socket sock;
+	private int connections, PROTOCOL_CHOICE = 1;
+	private Socket sock;
+	private TextView textBox;
+	private ServerSocketFactory serverSocketFactory = ServerSocketFactory.getDefault();
 
-	public ServerSocketHandler(File file){
+	public ServerSocketHandler(File file, TextView text, int choice){
 		path = file;
 		connections = 0;
+		textBox = text;
+		PROTOCOL_CHOICE = choice;
 		
 		try {
-			connection = new ServerSocket(5000);
+			connection = serverSocketFactory.createServerSocket(5000);
 		}catch (IOException e) {
 			System.out.println("Error setting up ServerSocket");
 			e.printStackTrace();
@@ -37,21 +40,21 @@ public class ServerSocketHandler extends Thread{
 		return connection;
 	}
 	
+	//method to run while while the application is running
+	//and wait for a client to connect
 	public void run(){
 		
 		System.out.println("Server handler started");
 		
 		while (true) {
 			try {
-				sock = connection.accept(); //block until a client connects
-				System.out.println("Server instance started");
-
-				SocketServer server = new SocketServer(sock, path);				
-				serverConnections.add(server);
-
-				connections++;
-				server.run();
-
+				
+				Socket clientConnection = null;
+				
+				clientConnection = connection.accept();
+				
+				new Thread(new SocketServer(clientConnection, path, textBox, PROTOCOL_CHOICE)).start();
+				
 			} catch(SocketException se){
 				System.out.println("socket exception, most likely socket closed");
 				//se.printStackTrace();
@@ -65,6 +68,7 @@ public class ServerSocketHandler extends Thread{
 		 }
 	}
 	
+	//method to close the server socket to end the thread when the application stops
 	public boolean closeSocket(){
 		
 		try{
